@@ -5,7 +5,7 @@ namespace restframe;
  */
 abstract class AuthFactory {
 	/**
-	 * check if authentcated
+	 * check if authenticated
 	 * @return bool
 	 */
 	abstract public function check();
