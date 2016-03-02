@@ -66,7 +66,7 @@ abstract class RestFrame {
 		}
 	}	
 	
-	public static function setCorsOrigin(array $origins) {
+	public static function setCorsOrigins(array $origins) {
 		self::$corsOrigins = $origins;
 	}
 	public static function setCorsMethods(array $methods) {
