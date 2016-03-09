@@ -3,65 +3,55 @@ namespace restframe;
 
 abstract class RestFrame {
 	private $ioFactory;
-	private $authFactory;
-	private static $exception = "\Exception";
 	private static $corsOrigins = array();
 	private static $corsMethods = array();
 	private static $corsHeaders = array();
 	
 	private function __construct(IOFactory $ioFactory) {
-		if ( ! empty(self::$corsOrigins) ) {
-			$headers = getallheaders();
-			if ( isset($headers['Origin']) && in_array($headers['Origin'],self::$corsOrigins) ) {
-				header("Access-Control-Allow-Origin: ".$headers['Origin']);
-				if ( ! empty(self::$corsMethods) ) {
-					header("Access-Control-Allow-Methods: ".implode(",",self::$corsMethods));
-				}
-				if ( ! empty(self::$corsHeaders) ) {
-					header("Access-Control-Allow-Headers: ".implode(",",self::$corsHeaders));
-				}
-			}
-		}
 		$this->ioFactory = $ioFactory;
-		try {
-			switch ( filter_input(INPUT_SERVER,"REQUEST_METHOD") ) {
-				case "POST":
-					echo $this->ioFactory->toString( $this->doPost() );
-					break;
-				case "OPTIONS":
-					echo $this->ioFactory->toString( $this->doOptions() );
-					break;
-				case "PUT":
-					echo $this->ioFactory->toString( $this->doPut() );
-					break;
-				case "DELETE":
-					echo $this->ioFactory->toString( $this->doDelete() );
-					break;				
-				default:
-					echo $this->ioFactory->toString( $this->doGet() );
-			}
-		} catch(\Exception $ex) {
-			throw new self::$exception($ex->getMessage());
+		$this->setHeaders();
+		switch ( filter_input(INPUT_SERVER,"REQUEST_METHOD") ) {
+			case "POST":		echo $ioFactory->toString( $this->doPost() ); break;
+			case "OPTIONS":		echo $ioFactory->toString( $this->doOptions() ); break;
+			case "PUT":			echo $ioFactory->toString( $this->doPut() ); break;
+			case "DELETE":		echo $ioFactory->toString( $this->doDelete() ); break;				
+			default:			echo $ioFactory->toString( $this->doGet() );
 		}
+	}
+	
+	private function setHeaders() {
+		$headers = getallheaders();
+		if ( ! empty(self::$corsOrigins) && isset($headers['Origin']) ){
+			if ( ! in_array($headers['Origin'],self::$corsOrigins) ) { 
+				throw new RestFrameCorsException($this->ioFactory,"CORS error",403); // if origin is not in list, throw 403
+			}
+			header("Access-Control-Allow-Origin: ".$headers['Origin']);
+			if ( ! empty(self::$corsMethods) ) {
+				header("Access-Control-Allow-Methods: ".implode(",",self::$corsMethods));
+			}
+			if ( ! empty(self::$corsHeaders) ) {
+				header("Access-Control-Allow-Headers: ".implode(",",self::$corsHeaders));
+			}
+		}		
 	}
 	
 	protected function requireAuth(AuthFactory $auth) {
 		if ( ! $auth->check() )  {
-			throw new self::$exception("Authentication error");
+			throw new RestFrameAuthException($this->ioFactory,"Authentication error",403);
 		}
 	}
 	
 	protected function requireGet(array $param) {
 		foreach ( $param AS $p) {
 			if ( filter_input(INPUT_GET,$p) == null ) {
-				throw new self::$exception("Missing parameter");
+				throw new RestFrameParameterException($this->ioFactory,"Parameter error",0);
 			}
 		}
 	}
 	protected function requirePost(array $param) {
 		foreach ( $param AS $p) {
 			if ( filter_input(INPUT_POST,$p) == null ) {
-				throw new self::$exception("Missing parameter");
+				throw new RestFrameParameterException($this->ioFactory,"Parameter error",0);
 			}
 		}
 	}	
@@ -75,11 +65,6 @@ abstract class RestFrame {
 	public static function setCorsHeaders(array $headers) {
 		self::$corsHeaders = $headers;
 	}	
-	public static function setException($exception) {
-		if ( new $exception() instanceof RestFrameException ) {
-			self::$exception = $exception;
-		}
-	}
 	
 	public static function run(IOFactory $ioFactory) {
 		new static($ioFactory);
